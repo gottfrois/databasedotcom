@@ -91,6 +91,9 @@ module Databasedotcom
       self.ca_file = ENV['DATABASEDOTCOM_CA_FILE'] || @options[:ca_file]
       self.verify_mode = ENV['DATABASEDOTCOM_VERIFY_MODE'] || @options[:verify_mode]
       self.verify_mode = self.verify_mode.to_i if self.verify_mode
+
+      @request_observers = []
+      @response_observers = []
     end
 
     # Authenticate to the Force.com API.  _options_ is a Hash, interpreted as follows:
@@ -130,6 +133,14 @@ module Databasedotcom
       self.version = "22.0" unless self.version
 
       self.oauth_token
+    end
+
+    def on_request(a_lambda)
+      @request_observers << a_lambda
+    end
+
+    def on_response(a_lambda)
+      @response_observers << a_lambda
     end
 
     # The SalesForce organization id for the authenticated user's Salesforce instance
@@ -396,6 +407,7 @@ module Databasedotcom
     end
 
     def log_request(path, options={})
+      @request_observers.each { |l| l.call(path, options) }
       base_url = options[:host] ? "https://#{options[:host]}" : self.instance_url
       puts "***** REQUEST: #{path.include?(':') ? path : URI.join(base_url, path)}#{options[:data] ? " => #{options[:data]}" : ''}" if self.debugging
     end
@@ -405,6 +417,7 @@ module Databasedotcom
     end
 
     def log_response(result)
+      @response_observers.each { |l| l.call(result) }
       puts "***** RESPONSE: #{result.class.name} -> #{result.body}" if self.debugging
     end
 
